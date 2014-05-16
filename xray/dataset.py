@@ -517,8 +517,8 @@ class Dataset(Mapping):
         """Dump dataset contents to a location on disk using the netCDF4
         package.
         """
-        with backends.NetCDF4DataStore(filepath, mode='w', **kwdargs) as store:
-            self.dump_to_store(store)
+        store = backends.NetCDF4DataStore(filepath, mode='w', **kwdargs)
+        self.dump_to_store(store)
 
     dump = to_netcdf
 

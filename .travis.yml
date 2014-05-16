@@ -37,4 +37,4 @@ install:
   - python setup.py install
 # Run test
 script:
-  - nosetests
+  - nosetests -v
