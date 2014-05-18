@@ -21,9 +21,8 @@ before_install:
 # Install packages
 install:
   - conda create --yes -n test_env python=$TRAVIS_PYTHON_VERSION pip nose mock numpy cython pandas scipy
-  - pip install https://github.com/jswhit2/netcdf4-python/archive/master.zip
   - source activate test_env
-  - echo $UPDATE_PYENV; $UPDATE_PYENV
+  - pip install https://github.com/jswhit2/netcdf4-python/archive/master.zip
   - python setup.py install
 # Run test
 script:
