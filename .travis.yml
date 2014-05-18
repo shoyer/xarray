@@ -22,6 +22,7 @@ before_install:
 install:
   - conda create --yes -n test_env python=$TRAVIS_PYTHON_VERSION pip nose mock numpy cython pandas scipy
   - source activate test_env
+  - sudo apt-get install libhdf5-serial-dev netcdf-bin libnetcdf-dev
   - pip install https://github.com/jswhit2/netcdf4-python/archive/master.zip
   - python setup.py install
 # Run test
