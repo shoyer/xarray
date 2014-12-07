@@ -1012,7 +1012,8 @@ class TestDataset(TestCase):
 
         # regression test for GH278
         ds = Dataset({'x': pd.Index(['bar']), 'a': ('y', [1])}).isel(x=0)
-        actual = ds.to_dataframe()
+        # use .loc to ensure consistent results on Python 3
+        actual = ds.to_dataframe().loc[:, ['a', 'x']]
         expected = pd.DataFrame([[1, 'bar']], index=pd.Index([0], name='y'),
                                 columns=['a', 'x'])
         assert expected.equals(actual), (expected, actual)
