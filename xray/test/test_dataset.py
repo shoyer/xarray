@@ -141,6 +141,32 @@ class TestDataset(TestCase):
             actual = Dataset({'x': arg})
             self.assertDatasetIdentical(expected, actual)
 
+    def test_constructor_auto_align(self):
+        a = DataArray([1, 2], [('x', [0, 1])])
+        b = DataArray([3, 4], [('x', [1, 2])])
+
+        # verify align uses outer join
+        expected = Dataset({'a': ('x', [1, 2, np.nan]),
+                            'b': ('x', [np.nan, 3, 4])})
+        actual = Dataset({'a': a, 'b': b})
+        self.assertDatasetIdentical(expected, actual)
+
+        # var with different dimensions
+        c = ('y', [3, 4])
+        expected2 = expected.merge({'c': c})
+        actual = Dataset({'a': a, 'b': b, 'c': c})
+        self.assertDatasetIdentical(expected2, actual)
+
+        # var that is only aligned against the aligned variables
+        d = ('x', [3, 2, 1])
+        expected3 = expected.merge({'d': d})
+        actual = Dataset({'a': a, 'b': b, 'd': d})
+        self.assertDatasetIdentical(expected3, actual)
+
+        e = ('x', [0, 0])
+        with self.assertRaisesRegexp(ValueError, 'conflicting sizes'):
+            Dataset({'a': a, 'b': b, 'e': e})
+
     def test_constructor_with_coords(self):
         with self.assertRaisesRegexp(ValueError, 'redundant variables and co'):
             Dataset({'a': ('x', [1])}, {'a': ('x', [1])})

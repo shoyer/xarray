@@ -9,6 +9,11 @@ What's New
     import xray
     np.random.seed(123456)
 
+v0.4 (unreleased)
+-----------------
+
+``Dataset.update`` no longer updates attributes as well as variables.
+
 v0.3.2 (23 December, 2014)
 --------------------------
 

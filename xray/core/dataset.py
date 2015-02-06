@@ -17,7 +17,7 @@ from . import variable
 from . import alignment
 from . import formatting
 from .. import backends, conventions
-from .alignment import align
+from .alignment import align, partial_align
 from .coordinates import DatasetCoordinates, Indexes
 from .common import ImplementsDatasetReduce, AttrAccessMixin
 from .utils import Frozen, SortedKeysDict, ChainMap
@@ -170,7 +170,18 @@ def _as_dataset_variable(name, var):
     return var
 
 
-def _expand_arrays(raw_variables, old_variables={}, compat='identical'):
+def _align_variables(arrays, join='outer'):
+    """Align all DataArrays in the provided dict, leaving other values alone.
+    """
+    alignable = [k for k, v in arrays.items() if hasattr(v, 'indexes')]
+    aligned = align(*[arrays[a] for a in alignable],
+                    join=join, copy=False)
+    new_arrays = OrderedDict(arrays)
+    new_arrays.update(zip(alignable, aligned))
+    return new_arrays
+
+
+def _expand_variables(raw_variables, old_variables={}, compat='identical'):
     """Expand a dictionary of variables.
 
     Returns a dictionary of Variable objects suitable for inserting into a
@@ -190,13 +201,13 @@ def _expand_arrays(raw_variables, old_variables={}, compat='identical'):
     def add_variable(name, var):
         if name not in variables:
             variables[name] = _as_dataset_variable(name, var)
+            new_coord_names.update(variables[name].dims)
         else:
             if not getattr(variables[name], compat)(var):
                 raise ValueError('conflicting value for variable %s:\n'
                                  'first value: %r\nsecond value: %r'
                                  % (name, variables[name], var))
             if compat == 'broadcast_equals':
-                new_dims = _as_dataset_variable(name, var).dims
                 common_dims = OrderedDict(zip(variables[name].dims,
                                               variables[name].shape))
                 common_dims.update(zip(var.dims, var.shape))
@@ -210,6 +221,8 @@ def _expand_arrays(raw_variables, old_variables={}, compat='identical'):
                 if dim != name:
                     add_variable(dim, coord)
         add_variable(name, var)
+
+    new_coord_names -= set(old_variables)
     return new_variables, new_coord_names
 
 
@@ -237,19 +250,39 @@ def _calculate_dims(variables):
     return dims
 
 
-class _DatasetLike(object):
-    """A Dataset-like object that only contains a few private attributes
+def _merge_core(aligned_self, other, overwrite_vars, compat):
+    new_variables = aligned_self._arrays.copy()
+    possible_conflicts = dict((k, v) for k, v in new_variables.items()
+                              if k not in overwrite_vars)
+    other_variables, new_coord_names = _expand_variables(
+        other, possible_conflicts, compat)
+    new_variables.update(other_variables)
+    return new_variables, new_coord_names
 
-    Like `as_dataset`, handles DataArrays, Datasets and dictionaries of
-    variables. The difference is that this method never creates a new Dataset
-    object, and hence is much more lightweight, avoiding any consistency
-    checks on the variables (that should be handled later).
-    """
-    def __init__(self, obj):
-        obj = getattr(obj, '_dataset', obj)
-        self._arrays = getattr(obj, '_arrays', obj)
-        self._coord_names = getattr(obj, '_coord_names', set())
-        self.attrs = getattr(obj, 'attrs', {})
+
+def _merge_dataset(self, other, overwrite_vars, compat, join):
+    aligned_self, other = partial_align(
+        self, other, join=join, copy=False, exclude=overwrite_vars)
+    new_variables, new_coord_names = _merge_core(
+        aligned_self, other._arrays, overwrite_vars, compat)
+    new_coord_names.update(other._coord_names)
+
+    return new_variables, new_coord_names
+
+
+def _merge_dict(self, other, overwrite_vars, compat, join):
+    other = _align_variables(other, join='outer')
+
+    alignable = [k for k, v in other.items() if hasattr(v, 'indexes')]
+    aligned = partial_align(self, *[other[a] for a in alignable],
+                            join=join, copy=False, exclude=overwrite_vars)
+
+    aligned_self = aligned[0]
+
+    other = OrderedDict(other)
+    other.update(zip(alignable, aligned[1:]))
+
+    return _merge_core(aligned_self, other, overwrite_vars, compat)
 
 
 def _assert_empty(args, msg='%s'):
@@ -361,8 +394,8 @@ class Dataset(Mapping, ImplementsDatasetReduce, AttrAccessMixin):
         if attrs is not None:
             self.attrs = attrs
 
-    def _add_missing_coords(self):
-        """Add missing coordinates IN-PLACE to _arrays
+    def _add_missing_coords_inplace(self):
+        """Add missing coordinates to self._arrays
         """
         for dim, size in iteritems(self.dims):
             if dim not in self._arrays:
@@ -397,8 +430,7 @@ class Dataset(Mapping, ImplementsDatasetReduce, AttrAccessMixin):
         # all checks are complete: it's safe to update
         self._arrays = arrays
         self._dims = dims
-        self._add_missing_coords()
-        self._coord_names.update(dims)
+        self._add_missing_coords_inplace()
         self._coord_names.update(new_coord_names)
 
     def _set_init_vars_and_dims(self, vars, coords):
@@ -408,14 +440,12 @@ class Dataset(Mapping, ImplementsDatasetReduce, AttrAccessMixin):
                       'redundant variables and coordinates: %s')
         arrays = ChainMap(vars, coords)
 
-        new_arrays, new_coord_names = _expand_arrays(arrays)
-        _assert_empty([k for k in new_coord_names if k not in new_arrays],
-                      'no matching variables exist for some coordinates: %s')
+        aligned = _align_variables(arrays)
+        new_variables, new_coord_names = _expand_variables(aligned)
 
         new_coord_names.update(coords)
-        self._update_vars_and_coords(new_arrays, new_coord_names,
-                                     needs_copy=False,
-                                     check_coord_names=False)
+        self._update_vars_and_coords(new_variables, new_coord_names,
+                                     needs_copy=False, check_coord_names=False)
 
     @classmethod
     def load_store(cls, store, decoder=None):
@@ -680,7 +710,7 @@ class Dataset(Mapping, ImplementsDatasetReduce, AttrAccessMixin):
         if utils.is_dict_like(key):
             raise NotImplementedError('cannot yet use a dictionary as a key '
                                       'to set Dataset values')
-        self.merge({key: value}, inplace=True, overwrite_vars=[key])
+        self.update({key: value})
 
     def __delitem__(self, key):
         """Remove a variable from this dataset.
@@ -1077,8 +1107,7 @@ class Dataset(Mapping, ImplementsDatasetReduce, AttrAccessMixin):
         return obj
 
     def update(self, other, inplace=True):
-        """Update this dataset's variables and attributes with those from
-        another dataset.
+        """Update this dataset's variables with those from another dataset.
 
         Parameters
         ----------
@@ -1099,14 +1128,13 @@ class Dataset(Mapping, ImplementsDatasetReduce, AttrAccessMixin):
             If any dimensions would have inconsistent sizes in the updated
             dataset.
         """
-        other = _DatasetLike(other)
         obj = self.merge(other, inplace=inplace,
-                         overwrite_vars=other._arrays)
-        obj.attrs.update(other.attrs)
+                         overwrite_vars=list(other), join='left')
+        # obj.attrs.update(other.attrs)
         return obj
 
     def merge(self, other, inplace=False, overwrite_vars=set(),
-              compat='broadcast_equals'):
+              compat='broadcast_equals', join='outer'):
         """Merge the arrays of two datasets into a single dataset.
 
         This method generally not allow for overriding data, with the exception
@@ -1127,12 +1155,17 @@ class Dataset(Mapping, ImplementsDatasetReduce, AttrAccessMixin):
         compat : {'broadcast_equals', 'equals', 'identical'}, optional
             String indicating how to compare variables of the same name for
             potential conflicts:
-
             - 'broadcast_equals': all values must be equal when variables are
               broadcast against each other to ensure common dimensions.
             - 'equals': all values and dimensions must be the same.
             - 'identical': all values, dimensions and attributes must be the
               same.
+        join : {'outer', 'inner', 'left', 'right'}, optional
+            Method for joining indexse between self and other:
+             - 'outer': use the union of the indexes
+             - 'inner': use the intersection of the indexes
+             - 'left': use indexes from self
+             - 'right': use indexes from other
 
         Returns
         -------
@@ -1147,34 +1180,18 @@ class Dataset(Mapping, ImplementsDatasetReduce, AttrAccessMixin):
         if compat not in ['broadcast_equals', 'equals', 'identical']:
             raise ValueError("compat=%r invalid: must be 'broadcast_equals', "
                              "'equals' or 'identical'" % compat)
-        other = _DatasetLike(other)
 
-        # determine variables to check for conflicts
-        if not overwrite_vars:
-            potential_conflicts = self._arrays
-        else:
-            if isinstance(overwrite_vars, basestring):
-                overwrite_vars = set([overwrite_vars])
-            else:
-                overwrite_vars = set(overwrite_vars)
-            potential_conflicts = dict((k, v) for k, v in iteritems(self._arrays)
-                                       if k not in overwrite_vars)
+        if isinstance(overwrite_vars, basestring):
+            overwrite_vars = [overwrite_vars]
+        overwrite_vars = set(overwrite_vars)
 
-        new_variables, new_coord_names = _expand_arrays(
-            other._arrays, potential_conflicts, compat)
-        new_coord_names |= other._coord_names
+        merge = _merge_dataset if isinstance(other, Dataset) else _merge_dict
 
-        _assert_empty([k for k in other._arrays
-                       if k in potential_conflicts
-                       and k not in new_coord_names
-                       and k in self.coords],
-                      'variables with these names already exist as '
-                      'coordinates: %s')
+        new_variables, new_coord_names = merge(self, other, overwrite_vars,
+                                               compat=compat, join=join)
 
-        # update variables
         obj = self if inplace else self.copy()
-        obj._update_vars_and_coords(new_variables, new_coord_names,
-                                    needs_copy=inplace)
+        obj._update_vars_and_coords(new_variables, new_coord_names)
         return obj
 
     def _assert_all_in_dataset(self, names, virtual_okay=False):
