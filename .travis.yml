@@ -30,7 +30,7 @@ matrix:
         - libhdf5-serial-dev
         - netcdf-bin
         - libnetcdf-dev
-    env: UPDATE_ENV="conda install cython && pip install https://github.com/Unidata/netcdf4-python/archive/master.zip"
+    env: UPDATE_ENV="conda install cython && pip install https://github.com/Unidata/netcdf4-python/archive/nogil.zip"
   allow_failures:
   - python: 2.7
     env: UPDATE_ENV="pip install pydap"
@@ -40,7 +40,7 @@ matrix:
         - libhdf5-serial-dev
         - netcdf-bin
         - libnetcdf-dev
-    env: UPDATE_ENV="conda install cython && pip install https://github.com/Unidata/netcdf4-python/archive/master.zip"
+    env: UPDATE_ENV="conda install cython && pip install https://github.com/Unidata/netcdf4-python/archive/nogil.zip"
 
 before_install:
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
