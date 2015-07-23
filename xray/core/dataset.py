@@ -1805,5 +1805,60 @@ class Dataset(Mapping, ImplementsDatasetReduce, BaseDataObject):
         ds._variables.update(new_vars)
         return ds
 
+    def diff(self, dim, n=1):
+        """Calculate the n-th order discrete difference along given axis.
+
+        Parameters
+        ----------
+        dim : str, optional
+            Dimension over which to calculate the finite difference.
+
+        n : int, optional
+            The number of times values are differenced.
+
+        Returns
+        -------
+        difference : same type as caller
+            The n-th order finite differnce of this object.
+
+        Examples
+        --------
+        >>> ds = xray.Dataset({'foo': ('x', [5, 5, 6, 6])})
+        >>> ds.diff('x')
+        <xray.Dataset>
+        Dimensions:  (x: 3)
+        Coordinates:
+          * x        (x) int64 1 2 3
+        Data variables:
+            foo      (x) int64 0 1 0
+        >>> ds.diff('x', 2)
+        <xray.Dataset>
+        Dimensions:  (x: 2)
+        Coordinates:
+        * x        (x) int64 2 3
+        Data variables:
+        foo      (x) int64 1 -1
+
+        """
+        if n == 0:
+            return self
+        if n < 0:
+            raise ValueError('order `n` must be non-negative but got {}'
+                             ''.format((n)))
+
+        kwargs_start = {dim: slice(None, -1)}
+        kwargs_end = {dim: slice(1, None)}
+        start = self.isel(**kwargs_start)
+        end = self.isel(**kwargs_end)
+        start.coords[dim] = end.coords[dim]
+
+        difference = end - start
+
+        if n > 1:
+            return difference.diff(dim, n - 1)
+        else:
+            return difference
+
+
 
 ops.inject_all_ops_and_reduce_methods(Dataset, array_only=False)

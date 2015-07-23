@@ -1052,6 +1052,39 @@ class DataArray(AbstractArray, BaseDataObject):
             return self
         return func
 
+    def diff(self, dim, n=1):
+        """Calculate the n-th order discrete difference along given axis.
+
+        Parameters
+        ----------
+        dim : str, optional
+            Dimension over which to calculate the finite difference.
+
+        n : int, optional
+            The number of times values are differenced.
+
+        Returns
+        -------
+        difference : same type as caller
+            The n-th order finite differnce of this object.
+
+        Examples
+        --------
+        >>> arr = xray.DataArray([5, 5, 6, 6], [[1, 2, 3, 4]], ['x'])
+        >>> arr.diff('x')
+        <xray.DataArray (x: 3)>
+        array([0, 1, 0])
+        Coordinates:
+        * x        (x) int64 2 3 4
+        >>> arr.diff('x', 2)
+        <xray.DataArray (x: 2)>
+        array([ 1, -1])
+        Coordinates:
+        * x        (x) int64 3 4
+
+        """
+        ds = self._dataset.diff(n=n, dim=dim)
+        return self._with_replaced_dataset(ds)
 
 # Add plotting methods
 # Alternatively these could be added using a Mixin
