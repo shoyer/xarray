@@ -1927,3 +1927,41 @@ class TestDataset(TestCase):
             ds.transpose('dim1', 'dim2', 'dim3')
         with self.assertRaisesRegexp(ValueError, 'arguments to transpose'):
             ds.transpose('dim1', 'dim2', 'dim3', 'time', 'extra_dim')
+
+    def test_dataset_diff_n1(self):
+        ds = create_test_data(seed=1)
+        actual = ds.diff('dim2')
+        expected = dict()
+        expected['var1'] = DataArray(np.diff(ds['var1'].values, axis=1),
+                                     [ds['dim1'].values,
+                                      ds['dim2'].values[1:]],
+                                     ['dim1', 'dim2'])
+        expected['var2'] = DataArray(np.diff(ds['var2'].values, axis=1),
+                                     [ds['dim1'].values,
+                                      ds['dim2'].values[1:]],
+                                     ['dim1', 'dim2'])
+        expected['var3'] = DataArray(np.zeros_like(ds['var3'].values),
+                                     [ds['dim3'].values, ds['dim1'].values],
+                                     ['dim3', 'dim1'])
+        expected = Dataset(expected, coords={'time': ds['time'].values})
+        expected.coords['numbers'] = ('dim3', ds['numbers'].values)
+        self.assertDatasetEqual(expected, actual)
+
+    def test_dataset_diff_n2(self):
+        ds = create_test_data(seed=1)
+        actual = ds.diff('dim2', n=2)
+        expected = dict()
+        expected['var1'] = DataArray(np.diff(ds['var1'].values, axis=1, n=2),
+                                     [ds['dim1'].values,
+                                      ds['dim2'].values[2:]],
+                                     ['dim1', 'dim2'])
+        expected['var2'] = DataArray(np.diff(ds['var2'].values, axis=1, n=2),
+                                     [ds['dim1'].values,
+                                      ds['dim2'].values[2:]],
+                                     ['dim1', 'dim2'])
+        expected['var3'] = DataArray(np.zeros_like(ds['var3'].values),
+                                     [ds['dim3'].values, ds['dim1'].values],
+                                     ['dim3', 'dim1'])
+        expected = Dataset(expected, coords={'time': ds['time'].values})
+        expected.coords['numbers'] = ('dim3', ds['numbers'].values)
+        self.assertDatasetEqual(expected, actual)
