@@ -1928,6 +1928,15 @@ class TestDataset(TestCase):
         with self.assertRaisesRegexp(ValueError, 'arguments to transpose'):
             ds.transpose('dim1', 'dim2', 'dim3', 'time', 'extra_dim')
 
+
+    def test_dataset_diff_n1_simple(self):
+        ds = Dataset({'foo': ('x', [5, 5, 6, 6])})
+        actual = ds.diff('x')
+        expected = Dataset({'foo': ('x', [0, 1, 0])})
+        expected.coords['x'].values = [1, 2, 3]
+        self.assertDatasetEqual(expected, actual)
+
+
     def test_dataset_diff_n1(self):
         ds = create_test_data(seed=1)
         actual = ds.diff('dim2')
@@ -1940,9 +1949,7 @@ class TestDataset(TestCase):
                                      [ds['dim1'].values,
                                       ds['dim2'].values[1:]],
                                      ['dim1', 'dim2'])
-        expected['var3'] = DataArray(np.zeros_like(ds['var3'].values),
-                                     [ds['dim3'].values, ds['dim1'].values],
-                                     ['dim3', 'dim1'])
+        expected['var3'] = ds['var3']
         expected = Dataset(expected, coords={'time': ds['time'].values})
         expected.coords['numbers'] = ('dim3', ds['numbers'].values)
         self.assertDatasetEqual(expected, actual)
@@ -1959,9 +1966,7 @@ class TestDataset(TestCase):
                                      [ds['dim1'].values,
                                       ds['dim2'].values[2:]],
                                      ['dim1', 'dim2'])
-        expected['var3'] = DataArray(np.zeros_like(ds['var3'].values),
-                                     [ds['dim3'].values, ds['dim1'].values],
-                                     ['dim3', 'dim1'])
+        expected['var3'] = ds['var3']
         expected = Dataset(expected, coords={'time': ds['time'].values})
         expected.coords['numbers'] = ('dim3', ds['numbers'].values)
         self.assertDatasetEqual(expected, actual)

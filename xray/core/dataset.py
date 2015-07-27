@@ -1805,7 +1805,7 @@ class Dataset(Mapping, ImplementsDatasetReduce, BaseDataObject):
         ds._variables.update(new_vars)
         return ds
 
-    def diff(self, dim, n=1):
+    def diff(self, dim, n=1, coord_new='upper'):
         """Calculate the n-th order discrete difference along given axis.
 
         Parameters
@@ -1815,6 +1815,12 @@ class Dataset(Mapping, ImplementsDatasetReduce, BaseDataObject):
 
         n : int, optional
             The number of times values are differenced.
+
+        coord_new : str, optional
+            The new coordinate in dimension ``dim`` will have the
+            values of either the minuend's or subtrahend's coordinate
+            for values 'upper' and 'lower', respectively.  Other
+            values are not supported.
 
         Returns
         -------
@@ -1844,21 +1850,43 @@ class Dataset(Mapping, ImplementsDatasetReduce, BaseDataObject):
             return self
         if n < 0:
             raise ValueError('order `n` must be non-negative but got {}'
-                             ''.format((n)))
+                             ''.format(n))
 
+        # prepare slices
         kwargs_start = {dim: slice(None, -1)}
         kwargs_end = {dim: slice(1, None)}
         start = self.isel(**kwargs_start)
         end = self.isel(**kwargs_end)
-        start.coords[dim] = end.coords[dim]
 
-        difference = end - start
+        # prepare new coordinate
+        if coord_new == 'upper':
+            start.coords[dim] = end.coords[dim]
+        elif coord_new == 'lower':
+            end.coords[dim] = start.coords[dim]
+        else:
+            raise ValueError('The \'coord_new\' argument has to be either '
+                             '\'upper\' or \'lower\'')
+
+        variables = OrderedDict()
+        for name, var in iteritems(self._variables):
+            if name not in variables.keys():
+                variables[name] = var
+            if dim in var.dims or not var.dims:
+                if name not in self.coords:
+                    variables[name] = end[name] - start[name]
+                    variables[dim] = variables[name].coords[dim]
+
+        difference = Dataset(variables, attrs=self.attrs)
+
+        for name, var in iteritems(self.coords):
+            if name not in difference.coords:
+                difference.coords[name] = var
+                difference.coords[name].values = var.values
 
         if n > 1:
             return difference.diff(dim, n - 1)
         else:
             return difference
-
 
 
 ops.inject_all_ops_and_reduce_methods(Dataset, array_only=False)
