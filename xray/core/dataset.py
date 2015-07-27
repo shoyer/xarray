@@ -1855,33 +1855,29 @@ class Dataset(Mapping, ImplementsDatasetReduce, BaseDataObject):
         # prepare slices
         kwargs_start = {dim: slice(None, -1)}
         kwargs_end = {dim: slice(1, None)}
-        start = self.isel(**kwargs_start)
-        end = self.isel(**kwargs_end)
 
         # prepare new coordinate
         if coord_new == 'upper':
-            start.coords[dim] = end.coords[dim]
+            kwargs_new = kwargs_end
         elif coord_new == 'lower':
-            end.coords[dim] = start.coords[dim]
+            kwargs_new = kwargs_start
         else:
             raise ValueError('The \'coord_new\' argument has to be either '
                              '\'upper\' or \'lower\'')
 
         variables = OrderedDict()
-        for name, var in iteritems(self._variables):
-            if name not in variables.keys():
+
+        for name, var in iteritems(self.variables):
+            if dim in var.dims:
+                if name in self.data_vars:
+                    variables[name] = (var.isel(**kwargs_end)
+                                       - var.isel(**kwargs_start))
+                else:
+                    variables[name] = var.isel(**kwargs_new)
+            else:
                 variables[name] = var
-            if dim in var.dims or not var.dims:
-                if name not in self.coords:
-                    variables[name] = end[name] - start[name]
-                    variables[dim] = variables[name].coords[dim]
 
-        difference = Dataset(variables, attrs=self.attrs)
-
-        for name, var in iteritems(self.coords):
-            if name not in difference.coords:
-                difference.coords[name] = var
-                difference.coords[name].values = var.values
+        difference = self._replace_vars_and_dims(variables)
 
         if n > 1:
             return difference.diff(dim, n - 1)
