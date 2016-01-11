@@ -235,7 +235,7 @@ def _cleanup_netcdf_time_units(units):
 def _encode_datetime_with_netcdf4(dates, units, calendar):
     """Fallback method for encoding dates using netCDF4-python.
 
-    This method is more flexible than xray's parsing using datetime64[ns]
+    This method is more flexible than xarray's parsing using datetime64[ns]
     arrays but also slower because it loops over each element.
     """
     import netCDF4 as nc4
@@ -619,7 +619,7 @@ def _infer_dtype(array):
             # the length of their first element
             dtype = np.dtype(dtype.kind)
         elif dtype.kind == 'O':
-            raise ValueError('unable to infer dtype; xray cannot '
+            raise ValueError('unable to infer dtype; xarray cannot '
                              'serialize arbitrary Python objects')
     return dtype
 
@@ -666,12 +666,12 @@ def encode_cf_variable(var, needs_copy=True, name=None):
 
     Parameters
     ----------
-    var : xray.Variable
+    var : xarray.Variable
         A variable holding un-encoded data.
 
     Returns
     -------
-    out : xray.Variable
+    out : xarray.Variable
         A variable which has been encoded as described above.
     """
     var = maybe_encode_datetime(var)
@@ -905,7 +905,7 @@ def cf_decoder(variables, attributes,
     Parameters
     ----------
     variables : dict
-        A dictionary mapping from variable name to xray.Variable
+        A dictionary mapping from variable name to xarray.Variable
     attributes : dict
         A dictionary mapping from attribute name to value
     concat_characters : bool
@@ -920,7 +920,7 @@ def cf_decoder(variables, attributes,
     Returns
     -------
     decoded_variables : dict
-        A dictionary mapping from variable name to xray.Variable objects.
+        A dictionary mapping from variable name to xarray.Variable objects.
     decoded_attributes : dict
         A dictionary mapping from attribute name to values.
     """
@@ -1005,14 +1005,14 @@ def cf_encoder(variables, attributes):
     Parameters
     ----------
     variables : dict
-        A dictionary mapping from variable name to xray.Variable
+        A dictionary mapping from variable name to xarray.Variable
     attributes : dict
         A dictionary mapping from attribute name to value
 
     Returns
     -------
     encoded_variables : dict
-        A dictionary mapping from variable name to xray.Variable,
+        A dictionary mapping from variable name to xarray.Variable,
     encoded_attributes : dict
         A dictionary mapping from attribute name to value
 

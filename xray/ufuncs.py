@@ -1,14 +1,14 @@
-"""xray specific universal functions
+"""xarray specific universal functions
 
 Handles unary and binary operations for the following types, in ascending
 priority order:
 - scalars
 - numpy.ndarray
 - dask.array.Array
-- xray.Variable
-- xray.DataArray
-- xray.Dataset
-- xray.core.groupby.GroupBy
+- xarray.Variable
+- xarray.DataArray
+- xarray.Dataset
+- xarray.core.groupby.GroupBy
 
 Once NumPy 1.10 comes out with support for overriding ufuncs, this module will
 hopefully no longer be necessary.

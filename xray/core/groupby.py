@@ -9,7 +9,7 @@ from .common import (
 )
 from .pycompat import zip
 from .utils import peek_at, maybe_wrap_array, safe_cast_to_index
-from .variable import as_variable, Variable, Coordinate
+from .variable import Variable, Coordinate
 
 
 def unique_value_groups(ar):
@@ -45,23 +45,23 @@ def _get_fill_value(dtype):
     return fill_value
 
 
-def _dummy_copy(xray_obj):
+def _dummy_copy(xarray_obj):
     from .dataset import Dataset
     from .dataarray import DataArray
-    if isinstance(xray_obj, Dataset):
+    if isinstance(xarray_obj, Dataset):
         res = Dataset(dict((k, _get_fill_value(v.dtype))
-                           for k, v in xray_obj.data_vars.items()),
+                           for k, v in xarray_obj.data_vars.items()),
                       dict((k, _get_fill_value(v.dtype))
-                           for k, v in xray_obj.coords.items()
-                           if k not in xray_obj.dims),
-                      xray_obj.attrs)
-    elif isinstance(xray_obj, DataArray):
-        res = DataArray(_get_fill_value(xray_obj.dtype),
+                           for k, v in xarray_obj.coords.items()
+                           if k not in xarray_obj.dims),
+                      xarray_obj.attrs)
+    elif isinstance(xarray_obj, DataArray):
+        res = DataArray(_get_fill_value(xarray_obj.dtype),
                         dict((k, _get_fill_value(v.dtype))
-                             for k, v in xray_obj.coords.items()
-                             if k not in xray_obj.dims),
-                        name=xray_obj.name,
-                        attrs=xray_obj.attrs)
+                             for k, v in xarray_obj.coords.items()
+                             if k not in xarray_obj.dims),
+                        name=xarray_obj.name,
+                        attrs=xarray_obj.attrs)
     else:  # pragma: no cover
         raise AssertionError
     return res
@@ -110,10 +110,7 @@ class GroupBy(object):
             raise ValueError("`group` must have a 'dims' attribute")
         group_dim, = group.dims
 
-        try:
-            expected_size = obj.dims[group_dim]
-        except TypeError:
-            expected_size = obj.shape[obj.get_axis_num(group_dim)]
+        expected_size = as_dataset(obj).dims[group_dim]
         if group.size != expected_size:
             raise ValueError('the group variable\'s length does not '
                              'match the length of this variable along its '
@@ -315,16 +312,19 @@ class DataArrayGroupBy(GroupBy, ImplementsArrayReduce):
             yield var[{self.group_dim: indices}]
 
     def _concat_shortcut(self, applied, concat_dim, positions):
-        # nb. don't worry too much about maintaining this method -- it does
-        # speed things up, but it's not very interpretable and there are much
-        # faster alternatives (e.g., doing the grouped aggregation in a
-        # compiled language)
         stacked = Variable.concat(
             applied, concat_dim, positions, shortcut=True)
         stacked.attrs.update(self.obj.attrs)
-        result = self.obj._replace_maybe_drop_dims(stacked)
-        result._coords[concat_dim.name] = as_variable(concat_dim, copy=True)
-        return result
+
+        name = self.obj.name
+        ds = self.obj._dataset.drop(name)
+        ds[concat_dim.name] = concat_dim
+        # remove extraneous dimensions
+        for dim in ds.dims:
+            if dim not in stacked.dims:
+                del ds[dim]
+        ds[name] = stacked
+        return ds[name]
 
     def _restore_dim_order(self, stacked):
         def lookup_order(dimension):

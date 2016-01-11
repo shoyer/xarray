@@ -15,11 +15,11 @@ VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 QUALIFIER = ''
 
 
-DISTNAME = 'xray'
+DISTNAME = 'xarray'
 LICENSE = 'Apache'
-AUTHOR = 'xray Developers'
+AUTHOR = 'xarray Developers'
 AUTHOR_EMAIL = 'xray-dev@googlegroups.com'
-URL = 'https://github.com/xray/xray'
+URL = 'https://github.com/pydata/xarray'
 CLASSIFIERS = [
     'Development Status :: 4 - Beta',
     'License :: OSI Approved :: Apache Software License',
@@ -62,9 +62,9 @@ describing scientific data in widespread use in the Earth sciences:
 Important links
 ---------------
 
-- HTML documentation: http://xray.readthedocs.org
-- Issue tracker: http://github.com/xray/xray/issues
-- Source code: http://github.com/xray/xray
+- HTML documentation: http://xarray.readthedocs.org
+- Issue tracker: http://github.com/pydata/xarray/issues
+- Source code: http://github.com/pydata/xarray
 - SciPy2015 talk: https://www.youtube.com/watch?v=X0pAhJgySxk
 """
 
@@ -90,7 +90,7 @@ if not ISRELEASED:
 
     if pipe is None or pipe.returncode != 0:
         # no git, or not in git dir
-        if os.path.exists('xray/version.py'):
+        if os.path.exists('xarray/version.py'):
             warnings.warn("WARNING: Couldn't get git revision, using existing xray/version.py")
             write_version = False
         else:
@@ -122,7 +122,7 @@ short_version = '%s'
 """
     if not filename:
         filename = os.path.join(
-            os.path.dirname(__file__), 'xray', 'version.py')
+            os.path.dirname(__file__), 'xarray', 'version.py')
 
     a = open(filename, 'w')
     try:

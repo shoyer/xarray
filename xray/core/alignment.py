@@ -257,7 +257,7 @@ def broadcast(*args):
     """Explicitly broadcast any number of DataArray or Dataset objects against
     one another.
 
-    xray objects automatically broadcast against each other in arithmetic
+    xarray objects automatically broadcast against each other in arithmetic
     operations, so this function should not be necessary for normal use.
 
     Parameters
@@ -281,21 +281,21 @@ def broadcast(*args):
 
     Broadcast two data arrays against one another to fill out their dimensions:
 
-    >>> a = xray.DataArray([1, 2, 3], dims='x')
-    >>> b = xray.DataArray([5, 6], dims='y')
+    >>> a = xr.DataArray([1, 2, 3], dims='x')
+    >>> b = xr.DataArray([5, 6], dims='y')
     >>> a
-    <xray.DataArray (x: 3)>
+    <xarray.DataArray (x: 3)>
     array([1, 2, 3])
     Coordinates:
       * x        (x) int64 0 1 2
     >>> b
-    <xray.DataArray (y: 2)>
+    <xarray.DataArray (y: 2)>
     array([5, 6])
     Coordinates:
       * y        (y) int64 0 1
-    >>> a2, b2 = xray.broadcast(a, b)
+    >>> a2, b2 = xr.broadcast(a, b)
     >>> a2
-    <xray.DataArray (x: 3, y: 2)>
+    <xarray.DataArray (x: 3, y: 2)>
     array([[1, 1],
            [2, 2],
            [3, 3]])
@@ -303,7 +303,7 @@ def broadcast(*args):
       * x        (x) int64 0 1 2
       * y        (y) int64 0 1
     >>> b2
-    <xray.DataArray (x: 3, y: 2)>
+    <xarray.DataArray (x: 3, y: 2)>
     array([[5, 6],
            [5, 6],
            [5, 6]])
@@ -313,10 +313,10 @@ def broadcast(*args):
 
     Fill out the dimensions of all data variables in a dataset:
 
-    >>> ds = xray.Dataset({'a': a, 'b': b})
-    >>> ds2, = xray.broadcast(ds)  # use tuple unpacking to extract one dataset
+    >>> ds = xr.Dataset({'a': a, 'b': b})
+    >>> ds2, = xr.broadcast(ds)  # use tuple unpacking to extract one dataset
     >>> ds2
-    <xray.Dataset>
+    <xarray.Dataset>
     Dimensions:  (x: 3, y: 2)
     Coordinates:
       * x        (x) int64 0 1 2
