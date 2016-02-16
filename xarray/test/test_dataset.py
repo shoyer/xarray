@@ -1862,21 +1862,23 @@ class TestDataset(TestCase):
         actual = ds.fillna(b[:3])
         self.assertDatasetIdentical(expected, actual)
 
-        # left align variables
+        # okay to only include some data variables
         ds['b'] = np.nan
-        actual = ds.fillna({'a': -1, 'c': 'foobar'})
+        actual = ds.fillna({'a': -1})
         expected = Dataset({'a': ('x', [-1, 1, -1, 3]), 'b': np.nan})
         self.assertDatasetIdentical(expected, actual)
 
-        # non-existent variables
-        ds2 = ds.copy(deep=True)
-        ds2.fillna({'x': 0})
-        self.assertDatasetIdentical(ds, ds2)
+        # but new data variables is not okay
+        with self.assertRaisesRegexp(ValueError, 'must be contained'):
+            ds.fillna({'x': 0})
 
-        # coords only
-        ds2 = ds.copy(deep=True)
-        ds2.fillna(Dataset(coords={'a': 0}))
-        self.assertDatasetIdentical(ds, ds2)
+        # empty argument should be OK
+        result = ds.fillna({})
+        self.assertDatasetIdentical(ds, result)
+
+        result = ds.fillna(Dataset(coords={'c': 42}))
+        expected = ds.assign_coords(c=42)
+        self.assertDatasetIdentical(expected, result)
 
         # groupby
         expected = Dataset({'a': ('x', range(4))})
