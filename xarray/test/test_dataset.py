@@ -1620,7 +1620,7 @@ class TestDataset(TestCase):
 
         ds = Dataset({'x': ('time', np.arange(100)),
                       'time': pd.date_range('2000-01-01', periods=100)})
-        with self.assertRaisesRegexp(ValueError, 'no overlapping labels'):
+        with self.assertRaisesRegexp(ValueError, 'incompat.* grouped binary'):
             ds + ds.groupby('time.month')
 
     def test_groupby_math_virtual(self):
@@ -1868,11 +1868,15 @@ class TestDataset(TestCase):
         expected = Dataset({'a': ('x', [-1, 1, -1, 3]), 'b': np.nan})
         self.assertDatasetIdentical(expected, actual)
 
-        with self.assertRaisesRegexp(ValueError, 'no overlapping'):
-            ds.fillna({'x': 0})
+        # non-existent variables
+        ds2 = ds.copy(deep=True)
+        ds2.fillna({'x': 0})
+        self.assertDatasetIdentical(ds, ds2)
 
-        with self.assertRaisesRegexp(ValueError, 'no overlapping'):
-            ds.fillna(Dataset(coords={'a': 0}))
+        # coords only
+        ds2 = ds.copy(deep=True)
+        ds2.fillna(Dataset(coords={'a': 0}))
+        self.assertDatasetIdentical(ds, ds2)
 
         # groupby
         expected = Dataset({'a': ('x', range(4))})
@@ -2191,16 +2195,11 @@ class TestDataset(TestCase):
         expected = (2 * ds[['bar']]).merge(ds.coords)
         self.assertDatasetIdentical(expected, actual)
 
-        with self.assertRaisesRegexp(ValueError, 'no overlapping data'):
-            ds + Dataset()
-
-
-        with self.assertRaisesRegexp(ValueError, 'no overlapping data'):
-            Dataset() + Dataset()
+        self.assertDatasetIdentical(ds + Dataset(), Dataset())
+        self.assertDatasetIdentical(Dataset() + Dataset(), Dataset())
 
         ds2 = Dataset(coords={'bar': 42})
-        with self.assertRaisesRegexp(ValueError, 'no overlapping data'):
-            ds + ds2
+        self.assertDatasetIdentical(ds + ds2, ds2)
 
         # maybe unary arithmetic with empty datasets should raise instead?
         self.assertDatasetIdentical(Dataset() + 1, Dataset())

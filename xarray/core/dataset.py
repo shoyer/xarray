@@ -1955,11 +1955,9 @@ class Dataset(Mapping, ImplementsDatasetReduce, BaseDataObject):
 
         def apply_over_both(lhs_data_vars, rhs_data_vars, lhs_vars, rhs_vars):
             dest_vars = OrderedDict()
-            performed_op = False
             for k in lhs_data_vars:
                 if k in rhs_data_vars:
                     dest_vars[k] = f(lhs_vars[k], rhs_vars[k])
-                    performed_op = True
                 elif inplace:
                     raise ValueError(
                         'datasets must have the same data variables '
@@ -1968,10 +1966,6 @@ class Dataset(Mapping, ImplementsDatasetReduce, BaseDataObject):
                 elif not drop_na_vars:
                     # this shortcuts left alignment of variables for fillna
                     dest_vars[k] = lhs_vars[k]
-            if not performed_op:
-                raise ValueError(
-                    'datasets have no overlapping data variables: %s, %s'
-                    % (list(lhs_data_vars), list(rhs_data_vars)))
             return dest_vars
 
         if utils.is_dict_like(other) and not isinstance(other, Dataset):
