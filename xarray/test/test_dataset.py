@@ -2197,11 +2197,11 @@ class TestDataset(TestCase):
         expected = (2 * ds[['bar']]).merge(ds.coords)
         self.assertDatasetIdentical(expected, actual)
 
-        self.assertDatasetIdentical(ds + Dataset(), Dataset())
+        self.assertDatasetIdentical(ds + Dataset(), ds.coords.to_dataset())
         self.assertDatasetIdentical(Dataset() + Dataset(), Dataset())
 
         ds2 = Dataset(coords={'bar': 42})
-        self.assertDatasetIdentical(ds + ds2, ds2)
+        self.assertDatasetIdentical(ds + ds2, ds.coords.merge(ds2))
 
         # maybe unary arithmetic with empty datasets should raise instead?
         self.assertDatasetIdentical(Dataset() + 1, Dataset())
