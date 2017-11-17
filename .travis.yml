@@ -19,7 +19,7 @@ matrix:
   - python: 3.5
     env: CONDA_ENV=py35
   - python: 3.6
-    env: CONDA_ENV=py36
+    env: CONDA_ENV=py36-libnetcdf45
   - python: 3.6
     env:
     - CONDA_ENV=py36
