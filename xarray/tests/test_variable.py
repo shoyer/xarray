@@ -114,6 +114,37 @@ class VariableSubclassTestCases(object):
         assert_identical(v._getitem_with_mask([0, -1, 1], fill_value=-99),
                          self.cls(['x'], [0, -99, 1]))
 
+    def test_getitem_with_mask_fancy(self):
+        def one_test(key):
+            # key should be a dict
+            v = self.cls(['x', 'y', 'z'], np.random.randn(4, 5, 6))
+            actual = v._getitem_with_mask(key)
+
+            valid_indices = (~np.isnan(actual.values)).nonzero()
+            for indices in zip(*valid_indices):
+                # all the not-nan key should be nonnegative.
+                assert all(key[d][index] >= 0 for d, index in
+                           zip(actual.dims, indices) if d in key.keys())
+                actual[indices] = np.nan
+            assert np.isnan(actual.values).all()
+
+        # orthogonal indexing
+        one_test({'x': [0, 1], 'y': [0, 1, 2], 'z': [3]})
+        one_test({'x': [0, 1]})
+        one_test({'x': [0, 1, -1], 'y': [0, 1, 2], 'z': [3]})
+        # vectorized indexing
+        one_test({'x': Variable('a', [0, 1, -1]),
+                  'y': Variable('a', [0, 1, 2])})
+        one_test({'x': Variable('a', [0, 1, -1]),
+                  'y': [-1, 2],
+                  'z': Variable('a', [0, 1, 2])})
+        # advanced indexing
+        one_test({'x': Variable(('a', 'b'), [[0, 1, -1], [3, 1, 2]]),
+                  'y': Variable('b', [0, -1, 2])})
+        one_test({'x': Variable(('a', 'b'), [[0, 1, -1], [3, 1, 2]]),
+                  'y': Variable('b', [0, -1, 2]),
+                  'z': Variable('a', [2, 1])})
+
     def test_getitem_with_mask_size_zero(self):
         v = self.cls(['x'], [])
         assert_identical(v._getitem_with_mask(-1), Variable((), np.nan))
@@ -1634,6 +1665,10 @@ class TestIndexVariable(TestCase, VariableSubclassTestCases):
     @pytest.mark.xfail
     def test_getitem_uint(self):
         super(TestIndexVariable, self).test_getitem_fancy()
+
+    @pytest.mark.xfail
+    def test_getitem_with_mask_fancy(self):
+        super(TestIndexVariable, self).test_getitem_with_mask_fancy()
 
 
 class TestAsCompatibleData(TestCase):
