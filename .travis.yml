@@ -92,7 +92,7 @@ before_install:
 install:
   - if [[ "$CONDA_ENV" == "docs" ]]; then
       conda env create -n test_env --file doc/environment.yml;
-      conda install --yes --name stable mock pillow sphinx sphinx_rtd_theme;
+      conda install --yes --name test_env mock pillow sphinx sphinx_rtd_theme;
     else
       conda env create -n test_env --file ci/requirements-$CONDA_ENV.yml;
     fi
