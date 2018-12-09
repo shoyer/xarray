@@ -12,19 +12,19 @@ from .accessors import DatetimeAccessor
 from .alignment import align, reindex_like_indexers
 from .common import AbstractArray, DataWithCoords
 from .coordinates import (
-    DataArrayCoordinates, Indexes, LevelCoordinatesSource,
+    DataArrayCoordinates, LevelCoordinatesSource,
     assert_coordinate_consistent, remap_label_indexers)
 from .dataset import Dataset, merge_indexes, split_indexes
 from .formatting import format_item
-from .options import OPTIONS, _get_keep_attrs
+from .indexes import Indexes, default_indexes, result_indexes
+from .options import OPTIONS
 from .pycompat import OrderedDict, basestring, iteritems, range, zip
 from .utils import (
     _check_inplace, decode_numpy_dict_values, either_dict_or_kwargs,
     ensure_us_time_resolution)
 from .merge import expand_variable_dicts, merge_variables
 from .variable import (
-    IndexVariable, Variable, as_compatible_data, as_variable,
-    assert_unique_multiindex_level_names, maybe_expand_multiindex)
+    IndexVariable, Variable, as_compatible_data, as_variable)
 
 
 def _infer_coords_and_dims(shape, coords, dims):
@@ -170,7 +170,7 @@ class DataArray(AbstractArray, DataWithCoords):
     dt = property(DatetimeAccessor)
 
     def __init__(self, data, coords=None, dims=None, name=None,
-                 attrs=None, encoding=None, fastpath=False):
+                 attrs=None, indexes=None, encoding=None, fastpath=False):
         """
         Parameters
         ----------
@@ -234,37 +234,46 @@ class DataArray(AbstractArray, DataWithCoords):
             coords, dims = _infer_coords_and_dims(data.shape, coords, dims)
             variable = Variable(dims, data, attrs, encoding, fastpath=True)
 
+            if indexes is None:
+                indexes = default_indexes(coords, variable.sizes)
+
         # uncomment for a useful consistency check:
         # assert all(isinstance(v, Variable) for v in coords.values())
 
         # These fully describe a DataArray
         self._variable = variable
         self._coords = coords
+        self._indexes = indexes
         self._name = name
 
         self._file_obj = None
-
         self._initialized = True
 
     __default = object()
 
-    def _replace(self, variable=None, coords=None, name=__default):
+    def _replace(self, variable=None, coords=None, name=__default,
+                 indexes=None):
         if variable is None:
             variable = self.variable
         if coords is None:
             coords = self._coords
         if name is self.__default:
             name = self.name
-        return type(self)(variable, coords, name=name, fastpath=True)
+        if indexes is None:
+            indexes = self._indexes
+        return type(self)(variable, coords, name=name, indexes=indexes,
+                          fastpath=True)
 
     def _replace_maybe_drop_dims(self, variable, name=__default):
         if variable.dims == self.dims:
             coords = self._coords.copy()
+            indexes = self._indexes.copy()
         else:
             allowed_dims = set(variable.dims)
             coords = OrderedDict((k, v) for k, v in self._coords.items()
                                  if set(v.dims) <= allowed_dims)
-        return self._replace(variable, coords, name)
+            (indexes,) = result_indexes([self._indexes], [coords])
+        return self._replace(variable, coords, name, indexes)
 
     def _replace_indexes(self, indexes):
         if not len(indexes):
@@ -540,7 +549,7 @@ class DataArray(AbstractArray, DataWithCoords):
     def indexes(self):
         """OrderedDict of pandas.Index objects used for label based indexing
         """
-        return Indexes(self._coords, self.sizes)
+        return Indexes(self._indexes)
 
     @property
     def coords(self):

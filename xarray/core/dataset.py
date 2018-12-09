@@ -22,8 +22,9 @@ from .common import (
     ALL_DIMS, DataWithCoords, ImplementsDatasetReduce,
     _contains_datetime_like_objects)
 from .coordinates import (
-    DatasetCoordinates, Indexes, LevelCoordinatesSource,
+    DatasetCoordinates, LevelCoordinatesSource,
     assert_coordinate_consistent, remap_label_indexers)
+from .indexes import Indexes, default_indexes, result_indexes
 from .dtypes import is_datetime_like
 from .merge import (
     dataset_merge_method, dataset_update_method, merge_data_and_coords,
@@ -314,7 +315,7 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
     _rolling_cls = rolling.DatasetRolling
     _resample_cls = resample.DatasetResample
 
-    def __init__(self, data_vars=None, coords=None, attrs=None,
+    def __init__(self, data_vars=None, coords=None, attrs=None, indexes=None,
                  compat='broadcast_equals'):
         """To load data from a file or file-like object, use the `open_dataset`
         function.
@@ -354,12 +355,18 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
         self._dims = {}
         self._attrs = None
         self._file_obj = None
+
         if data_vars is None:
             data_vars = {}
         if coords is None:
             coords = {}
         if data_vars is not None or coords is not None:
             self._set_init_vars_and_dims(data_vars, coords, compat)
+
+        if indexes is None:
+            indexes = default_indexes(self._variables, self._dims)
+        self._indexes = indexes
+
         if attrs is not None:
             self.attrs = attrs
         self._encoding = None
@@ -628,8 +635,8 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
         return new._persist_inplace(**kwargs)
 
     @classmethod
-    def _construct_direct(cls, variables, coord_names, dims=None, attrs=None,
-                          file_obj=None, encoding=None):
+    def _construct_direct(cls, variables, coord_names, dims, attrs,
+                          indezes, file_obj=None, encoding=None):
         """Shortcut around __init__ for internal use when we want to skip
         costly validation
         """
@@ -638,6 +645,7 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
         obj._coord_names = coord_names
         obj._dims = dims
         obj._attrs = attrs
+        obj._indexes = indexes
         obj._file_obj = file_obj
         obj._encoding = encoding
         obj._initialized = True
@@ -647,11 +655,13 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
 
     @classmethod
     def _from_vars_and_coord_names(cls, variables, coord_names, attrs=None):
+        raise NotImplemented  # needs indexes
         dims = dict(calculate_dimensions(variables))
         return cls._construct_direct(variables, coord_names, dims, attrs)
 
     def _replace_vars_and_dims(self, variables, coord_names=None, dims=None,
-                               attrs=__default_attrs, inplace=False):
+                               attrs=__default_attrs, indexes=None,
+                               inplace=False):
         """Fastpath constructor for internal use.
 
         Preserves coord names and attributes. If not provided explicitly,
@@ -680,16 +690,22 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
                 self._coord_names = coord_names
             if attrs is not self.__default_attrs:
                 self._attrs = attrs
+            if indexes is not None:
+                self._indexes = indexes
             obj = self
         else:
             if coord_names is None:
                 coord_names = self._coord_names.copy()
             if attrs is self.__default_attrs:
                 attrs = self._attrs_copy()
-            obj = self._construct_direct(variables, coord_names, dims, attrs)
+            if indexes is None:
+                indexes = self._indexes.copy()
+            obj = self._construct_direct(
+                variables, coord_names, dims, attrs, indexes)
         return obj
 
     def _replace_indexes(self, indexes):
+        assert False, 'needs indexes update'
         if not len(indexes):
             return self
         variables = self._variables.copy()
@@ -1036,7 +1052,7 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
     def indexes(self):
         """OrderedDict of pandas.Index objects used for label based indexing
         """
-        return Indexes(self._variables, self._dims)
+        return Indexes(self._indexes)
 
     @property
     def coords(self):
