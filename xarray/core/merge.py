@@ -6,7 +6,8 @@ from .alignment import deep_align
 from .pycompat import OrderedDict, basestring
 from .utils import Frozen
 from .variable import (
-    as_variable, assert_unique_multiindex_level_names, maybe_expand_multiindex)
+    as_variable, assert_unique_multiindex_level_names, maybe_expand_multiindex,
+    IndexVariable)
 
 PANDAS_TYPES = (pd.Series, pd.DataFrame, pd.Panel)
 
@@ -109,9 +110,10 @@ class OrderedDefaultDict(OrderedDict):
 
 
 def merge_variables(
-        list_of_variables_dicts,  # type: List[Mapping[Any, Variable]]
-        priority_vars=None,       # type: Optional[Mapping[Any, Variable]]
-        compat='minimal',         # type: str
+        list_of_vars_and_indexes,  # type: List[Tuple[Mapping[Any, Variable], Mapping[Any, pd.Index]]]]
+        indexes,                   # type: Mapping[Any, pd.Index]
+        priority_vars=None,        # type: Optional[Mapping[Any, Variable]]
+        compat='minimal',          # type: str
 ):
     # type: (...) -> OrderedDict[Any, Variable]
     """Merge dicts of variables, while resolving conflicts appropriately.
@@ -140,7 +142,7 @@ def merge_variables(
     dim_compat = min(compat, 'equals', key=_VALID_COMPAT.get)
 
     lookup = OrderedDefaultDict(list)
-    for variables in list_of_variables_dicts:
+    for (variables, indexes) in list_of_vars_and_indexes:
         for name, var in variables.items():
             lookup[name].append(var)
 
@@ -156,8 +158,8 @@ def merge_variables(
         else:
             dim_variables = [var for var in variables if (name,) == var.dims]
             if dim_variables:
-                # if there are dimension coordinates, these must be equal (or
-                # identical), and they take priority over non-dimension
+                # if any variables are indexed coordinates, these must be equal
+                # (or identical), and they take priority over non-dimension
                 # coordinates
                 merged[name] = unique_variable(name, dim_variables, dim_compat)
             else:
@@ -172,7 +174,7 @@ def merge_variables(
     return merged
 
 
-def expand_variable_dicts(list_of_variable_dicts):
+def expand_variables_and_indexes(list_of_variable_dicts):
     # type: (List[Union[Dataset, Dict]]) -> List[Dict[Any, Variable]]
     """Given a list of dicts with xarray object values, expand the values.
 
@@ -194,14 +196,15 @@ def expand_variable_dicts(list_of_variable_dicts):
     from .dataarray import DataArray
     from .dataset import Dataset
 
-    var_dicts = []
+    result_dicts = []
 
     for variables in list_of_variable_dicts:
         if isinstance(variables, Dataset):
-            var_dicts.append(variables.variables)
+            result_dicts.append((variables.variables, variables.indexes))
         else:
             sanitized_vars = OrderedDict()
-            var_dicts.append(sanitized_vars)
+            sanitized_indexes = {}
+            result_dicts.append((sanitized_vars, sanitized_indexes))
 
             for name, var in variables.items():
                 if isinstance(var, DataArray):
@@ -209,17 +212,21 @@ def expand_variable_dicts(list_of_variable_dicts):
                     coords = var._coords.copy()
                     # explicitly overwritten variables should take precedence
                     coords.pop(name, None)
-                    var_dicts.append(coords)
+                    result_dicts.append((coords, var.indexes))
+
+                var = as_variable(var, name=name)
 
                 multiindex_vars = maybe_expand_multiindex(var, name)
                 if multiindex_vars is not None:
-                    var_dicts.append(multiindex_vars)
+                    index = var.to_index()
+                    indexes = {k: index for k in multiindex_vars}
+                    result_dicts.append((multiindex_vars, indexes))
 
-                var = as_variable(var, name=name)
                 sanitized_vars[name] = var
+                if isinstance(var, IndexVariable):
+                    sanitized_indexes[name] = var.to_index()
 
-
-    return var_dicts
+    return result_dicts
 
 
 def determine_coords(list_of_variable_dicts):
@@ -301,8 +308,9 @@ def merge_coords_for_inplace_math(objs, priority_vars=None):
 
     This function is used for merging variables in coordinates.py.
     """
-    expanded = expand_variable_dicts(objs)
-    variables = merge_variables(expanded, priority_vars)
+    expanded_vars, expanded_indexes = expand_variables_and_indexes(objs)
+    variables = merge_variables(expanded_vars, priority_vars)
+    indexes = 
     # assert_unique_multiindex_level_names(variables)
     return variables
 

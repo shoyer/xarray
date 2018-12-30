@@ -275,7 +275,7 @@ def reindex_variables(variables, sizes, indexes, indexers, method=None,
     sizes : dict-like
         Dictionary from dimension names to integer sizes.
     indexes : dict-like
-        Dictionary of xarray.IndexVariable objects associated with variables.
+        Dictionary of pandas.Index objects associated with this object.
     indexers : dict
         Dictionary with keys given by dimension names and values given by
         arrays of coordinates tick labels. Any mis-matched coordinate values
@@ -302,6 +302,10 @@ def reindex_variables(variables, sizes, indexes, indexers, method=None,
     -------
     reindexed : OrderedDict
         Another dict, with the items in variables but replaced indexes.
+    new_sizes : Dict[Any, int]
+        New sizes of each diension.
+    new_indexes : Dict[Any, pd.Index]
+        New indexes.
     """
     from .dataarray import DataArray
 
@@ -311,8 +315,9 @@ def reindex_variables(variables, sizes, indexes, indexers, method=None,
     masked_dims = set()
     unchanged_dims = set()
 
-    # size of reindexed dimensions
-    new_sizes = {}
+    # size and indexes for the reindexed result
+    new_sizes = dict(sizes)
+    new_indexes = dict(indexes)
 
     for name, index in iteritems(indexes):
         if name in indexers:
@@ -323,6 +328,7 @@ def reindex_variables(variables, sizes, indexes, indexers, method=None,
 
             target = utils.safe_cast_to_index(indexers[name])
             new_sizes[name] = len(target)
+            new_indexes[name] = target
 
             int_indexer = get_indexer_nd(index, target, method, tolerance)
 
@@ -334,7 +340,6 @@ def reindex_variables(variables, sizes, indexes, indexers, method=None,
                 unchanged_dims.add(name)
 
             int_indexers[name] = int_indexer
-            targets[name] = target
 
     for dim in sizes:
         if dim not in indexes and dim in indexers:
@@ -385,7 +390,7 @@ def reindex_variables(variables, sizes, indexes, indexers, method=None,
 
             reindexed[name] = new_var
 
-    return reindexed
+    return reindexed, new_sizes, new_indexes
 
 
 def broadcast(*args, **kwargs):

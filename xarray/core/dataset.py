@@ -717,23 +717,23 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
                        if k in coord_names}
         return _replace(variable, coord_names, dims, attrs, indexes, inplace)
 
-    def _replace_indexes(self, indexes):
-        # TODO: remove?
-        if not len(indexes):
-            return self
-        variables = self._variables.copy()
-        for name, idx in indexes.items():
-            variables[name] = IndexVariable(name, idx)
-        obj = self._replace_with_new_dims(variables)
+    # def _replace_indexes(self, indexes):
+    #     # TODO: remove?
+    #     if not len(indexes):
+    #         return self
+    #     variables = self._variables.copy()
+    #     for name, idx in indexes.items():
+    #         variables[name] = IndexVariable(name, idx)
+    #     obj = self._replace_with_new_dims(variables)
 
-        # switch from dimension to level names, if necessary
-        # dim_names = {}
-        # for dim, idx in indexes.items():
-        #     if not isinstance(idx, pd.MultiIndex) and idx.name != dim:
-        #         dim_names[dim] = idx.name
-        # if dim_names:
-        #     obj = obj.rename(dim_names)
-        return obj
+    #     # switch from dimension to level names, if necessary
+    #     # dim_names = {}
+    #     # for dim, idx in indexes.items():
+    #     #     if not isinstance(idx, pd.MultiIndex) and idx.name != dim:
+    #     #         dim_names[dim] = idx.name
+    #     # if dim_names:
+    #     #     obj = obj.rename(dim_names)
+    #     return obj
 
     def copy(self, deep=False, data=None):
         """Returns a copy of this dataset.
@@ -1627,8 +1627,8 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
         pos_indexers, new_indexes = remap_label_indexers(
             self, indexers=indexers, method=method, tolerance=tolerance)
         result = self.isel(indexers=pos_indexers, drop=drop)
-        # TODO: fix this?
-        return result._replace_indexes(new_indexes)
+        # TODO: use new_indexes?
+        return result
 
     def reindex_like(self, other, method=None, tolerance=None, copy=True):
         """Conform this object onto the indexes of another object, filling
@@ -1730,12 +1730,12 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
         if bad_dims:
             raise ValueError('invalid reindex dimensions: %s' % bad_dims)
 
-        variables = alignment.reindex_variables(
+        variables, dims, indexes = alignment.reindex_variables(
             self.variables, self.sizes, self.indexes, indexers, method,
             tolerance, copy=copy)
         coord_names = set(self._coord_names)
         coord_names.update(indexers)
-        return self._replace_with_new_dims(variables, coord_names)
+        return self._replace(variables, coord_names, dims, indexes=indexes)
 
     def interp(self, coords=None, method='linear', assume_sorted=False,
                kwargs={}, **coords_kwargs):
@@ -1891,6 +1891,45 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
             ds = self.reindex(object_coords)
         return ds.interp(numeric_coords, method, assume_sorted, kwargs)
 
+    # Helper methods for rename(), rename_vars() and rename_dims()
+
+    def _rename_vars(self, name_dict, dims_dict):
+        variables = OrderedDict()
+        coord_names = set()
+        for k, v in iteritems(self._variables):
+            name = name_dict.get(k, k)
+            dims = tuple(dims_dict.get(dim, dim) for dim in v.dims)
+            var = v.copy(deep=False)
+            var.dims = dims
+            if name in variables:
+                raise ValueError('the new name %r conflicts' % (name,))
+            variables[name] = var
+            if k in self._coord_names:
+                coord_names.add(name)
+        return variables, coord_names
+
+    def _rename_dims(self, dims_dict):
+        return {dims_dict.get(k, k): v for k, v in self.dims.items()}
+
+    def _rename_indexes(self, name_dict):
+        indexes = {}
+        for k, v in self.indexes.items():
+            new_name = name_dict.get(k, k)
+            if isinstance(v, pd.MultiIndex):
+                new_names = [name_dict.get(k, k) for k in v.names]
+                index = pd.MultiIndex(v.levels, v.labels, v.sortorder,
+                                      names=new_names, verify_integrity=False) 
+            else:
+                index = pd.Index(v, name=new_name)
+            indexes[new_name] = index
+        return indexes
+
+    def _rename_all(slef, name_dict, dim_dict):
+        variables, coord_names = self._rename_vars(name_dict, dim_dict)
+        dims = self._rename_dims(dim_dict)
+        indexes = self._rename_indexes(name_dict)
+        return variables, coord_names, dims, indexes
+
     def rename(self, name_dict=None, inplace=None, **names):
         """Returns a new object with renamed variables and dimensions.
 
@@ -1913,9 +1952,11 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
 
         See Also
         --------
-        Dataset.swap_dims
+        Dataset.rename_dims
+        Dataset.rename_vars
         DataArray.rename
         """
+        # TODO: add separate rename_vars and rename_dims methods.
         inplace = _check_inplace(inplace)
         name_dict = either_dict_or_kwargs(name_dict, names, 'rename')
         for k, v in name_dict.items():
@@ -1923,87 +1964,91 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
                 raise ValueError("cannot rename %r because it is not a "
                                  "variable or dimension in this dataset" % k)
 
-        variables = OrderedDict()
-        coord_names = set()
-        for k, v in iteritems(self._variables):
-            name = name_dict.get(k, k)
-            dims = tuple(name_dict.get(dim, dim) for dim in v.dims)
-            var = v.copy(deep=False)
-            var.dims = dims
-            if name in variables:
-                raise ValueError('the new name %r conflicts' % (name,))
-            variables[name] = var
-            if k in self._coord_names:
-                coord_names.add(name)
+        variables, coord_names, dims, indexes = self._rename_all(
+            name_dict=name_dict, dim_dict=name_dict)
+        return self._replace(variables, coord_names, dims=dims,
+                             indexes=indexes, inplace=inplace)
 
-        dims = OrderedDict((name_dict.get(k, k), v)
-                           for k, v in self.dims.items())
-
-        indexes = {}
-        for k, v in self._indexes.items():
-            if isinstance(v, pd.MultiIndex):
-                names = [name_dict.get(k, k) for k in v.names]
-                index = pd.MultiIndex(v.levels, v.labels, v.sortorder,
-                                      names=names, verify_integrity=False) 
-            else:
-                index = pd.Index(v, name=name_dict.get(k, k))
-            indexes[k] = index
-
-        return self._replace_vars_and_dims(variables, coord_names, dims=dims,
-                                           indexes=indexes, inplace=inplace)
-
-    def swap_dims(self, dims_dict, inplace=None):
-        """Returns a new object with swapped dimensions.
+    def rename_dims(self, dim_dict, inplace=None, **dims):
+        """Returns a new object with renamed dimensions only.
 
         Parameters
         ----------
-        dims_dict : dict-like
+        dim_dict : dict-like
             Dictionary whose keys are current dimension names and whose values
-            are new names. Each value must already be a variable in the
-            dataset.
+            are new names.
         inplace : bool, optional
             If True, swap dimensions in-place. Otherwise, return a new dataset
             object.
+        **dimss, optional
+            Keyword form of ``dim_dict``.
+            One of dim_dict or dims must be provided.
 
         Returns
         -------
         renamed : Dataset
-            Dataset with swapped dimensions.
+            Dataset with renamed dimensions and the same variable names.
 
         See Also
         --------
 
         Dataset.rename
+        Dataset.rename_vars
         DataArray.swap_dims
         """
         inplace = _check_inplace(inplace)
-        for k, v in dims_dict.items():
+        dim_dict = either_dict_or_kwargs(dim_dict, dims, 'rename')
+        for k, v in dim_dict.items():
             if k not in self.dims:
-                raise ValueError('cannot swap from dimension %r because it is '
-                                 'not an existing dimension' % k)
-            if self.variables[v].dims != (k,):
-                raise ValueError('replacement dimension %r is not a 1D '
-                                 'variable along the old dimension %r'
-                                 % (v, k))
+                raise ValueError("cannot rename %r because it is not a "
+                                 "dimension in this dataset" % k)
 
-        result_dims = set(dims_dict.get(dim, dim) for dim in self.dims)
+        variables, coord_names, dims, indexes = self._rename_all(
+            name_dict={}, dim_dict=dim_dict)
+        return self._replace(variables, coord_names, dims=dims,
+                             indexes=indexes, inplace=inplace)
 
-        variables = OrderedDict()
+    # TODO: depreacte the old name?
+    swap_dims = rename_dims
 
-        coord_names = self._coord_names.copy()
-        coord_names.update(dims_dict.values())
+    def rename_vars(self, name_dict=None, inplace=None, **names):
+        """Returns a new object with renamed variables only.
 
-        # for k, v in iteritems(self.variables):
-        #     dims = tuple(dims_dict.get(dim, dim) for dim in v.dims)
-        #     if k in result_dims:
-        #         var = v.to_index_variable()
-        #     else:
-        #         var = v.to_base_variable()
-        #     var.dims = dims
-        #     variables[k] = var
+        Parameters
+        ----------
+        name_dict : dict-like, optional
+            Dictionary whose keys are current variable names and whose values
+            are the desired names.
+        inplace : bool, optional
+            If True, rename variables and dimensions in-place. Otherwise,
+            return a new dataset object.
+        **names, optional
+            Keyword form of ``name_dict``.
+            One of name_dict or names must be provided.
 
-        return self._replace_vars_and_dims(variables, coord_names,
-                                           inplace=inplace)
+        Returns
+        -------
+        renamed : Dataset
+            Dataset with renamed variables.
+
+        See Also
+        --------
+
+        Dataset.rename
+        Dataset.rename_dims
+        DataArray.swap_dims
+        """
+        inplace = _check_inplace(inplace)
+        name_dict = either_dict_or_kwargs(name_dict, dims, 'rename')
+        for k, v in name_dict.items():
+            if k not in self.variables:
+                raise ValueError("cannot rename %r because it is not a "
+                                 "variable in this dataset" % k)
+
+        variables, coord_names, dims, indexes = self._rename_all(
+            name_dict=name_dict, dim_dict={})
+        return self._replace(variables, coord_names, dims=dims,
+                             indexes=indexes, inplace=inplace)
 
     def expand_dims(self, dim, axis=None):
         """Return a new object with an additional axis (or axes) inserted at the
@@ -2089,7 +2134,12 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
                 variables[k] = v.set_dims(k)
                 indexes[k] = variables[k].to_index()
 
-        return self._replace_vars_and_dims(variables, self._coord_names)
+        new_dims = dict(self._dims)
+        for d in dim:
+            new_dims[d] = 1
+
+        return self._replace(variables, self._coord_names, dims=new_dims,
+                             indexes=indexes)
 
     def set_index(self, indexes=None, append=False, inplace=None,
                   **indexes_kwargs):
@@ -2282,12 +2332,17 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords,
                 else:
                     variables[name] = var
 
+        indexes = self._indexes.copy()
+        del indexes[dim]
+
         for name, lev in zip(new_dim_names, index.levels):
             variables[name] = IndexVariable(name, lev)
+            indexes[name] = lev
 
         coord_names = set(self._coord_names) - set([dim]) | set(new_dim_names)
 
-        return self._replace_vars_and_dims(variables, coord_names)
+        return self._replace_with_new_dims(
+            variables, coord_names, indexes=indexes)
 
     def unstack(self, dim=None):
         """
