@@ -26,8 +26,8 @@ class H5NetCDFArrayWrapper(BaseNetCDF4Array):
         # h5py requires using lists for fancy indexing:
         # https://github.com/h5py/h5py/issues/992
         key = tuple(list(k) if isinstance(k, np.ndarray) else k for k in key)
-        array = self.get_array()
         with self.datastore.lock:
+            array = self.get_array(needs_lock=False)
             return array[key]
 
 
@@ -208,10 +208,12 @@ class H5NetCDFStore(WritableCFDataStore):
 
         encoding['chunks'] = encoding.pop('chunksizes', None)
 
-        for key in ['compression', 'compression_opts', 'shuffle',
-                    'chunks', 'fletcher32']:
-            if key in encoding:
-                kwargs[key] = encoding[key]
+        # Do not apply compression, filters or chunking to scalars.
+        if variable.shape:
+            for key in ['compression', 'compression_opts', 'shuffle',
+                        'chunks', 'fletcher32']:
+                if key in encoding:
+                    kwargs[key] = encoding[key]
         if name not in self.ds:
             nc4_var = self.ds.create_variable(
                 name, dtype=dtype, dimensions=variable.dims,
@@ -228,9 +230,6 @@ class H5NetCDFStore(WritableCFDataStore):
 
     def sync(self):
         self.ds.sync()
-        # if self.autoclose:
-        #     self.close()
-        # super(H5NetCDFStore, self).sync(compute=compute)
 
     def close(self, **kwargs):
         self._manager.close(**kwargs)
