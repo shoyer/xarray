@@ -13,22 +13,37 @@ What's New
     import xarray as xr
     np.random.seed(123456)
 
-.. warning::
+.. _whats-new.0.11.2:
 
-    Xarray plans to drop support for python 2.7 at the end of 2018. This
-    means that new releases of xarray published after this date will only be
-    installable on python 3+ environments, but older versions of xarray will
-    always be available to python 2.7 users. For more information see the
-    following references
+v0.11.2 (unreleased)
+--------------------
 
-     - `Xarray Github issue discussing dropping Python 2 <https://github.com/pydata/xarray/issues/1829>`__
-  - `Python 3 Statement <http://www.python3statement.org/>`__
-  - `Tips on porting to Python 3 <https://docs.python.org/3/howto/pyporting.html>`__
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Enhancements
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
 
 .. _whats-new.0.11.1:
 
-v0.11.1 (unreleased)
---------------------
+v0.11.1 (29 December 2018)
+--------------------------
+
+This minor release includes a number of enhancements and bug fixes, and two
+(slightly) breaking changes.
+
+.. warning::
+
+  This is the last xarray release that will support Python 2.7. Future releases
+  will be Python 3 only, but older versions of xarray will always be available
+  for Python 2.7 users. For the more details, see:
+
+  - `Xarray Github issue discussing dropping Python 2 <https://github.com/pydata/xarray/issues/1829>`__
+  - `Python 3 Statement <http://www.python3statement.org/>`__
+  - `Tips on porting to Python 3 <https://docs.python.org/3/howto/pyporting.html>`__
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
@@ -55,7 +70,8 @@ Enhancements
   reprojection, see  (:issue:`2588`).
   By `Scott Henderson <https://github.com/scottyhq>`_.
 - Like :py:class:`pandas.DatetimeIndex`, :py:class:`CFTimeIndex` now supports
-  "dayofyear" and "dayofweek" accessors (:issue:`2597`).  By `Spencer Clark
+  "dayofyear" and "dayofweek" accessors (:issue:`2597`).  Note this requires a
+  version of cftime greater than 1.0.2.  By `Spencer Clark
   <https://github.com/spencerkclark>`_.
 - The option ``'warn_for_unclosed_files'`` (False by default) has been added to
   allow users to enable a warning when files opened by xarray are deallocated
@@ -66,9 +82,19 @@ Enhancements
 - :py:meth:`DataArray.resample` and :py:meth:`Dataset.resample` now supports the
   ``loffset`` kwarg just like Pandas.
   By `Deepak Cherian <https://github.com/dcherian>`_
+- Datasets are now guaranteed to have a ``'source'`` encoding, so the source
+  file name is always stored (:issue:`2550`).
+  By `Tom Nicholas <http://github.com/TomNicholas>`_.
+- The ``apply`` methods for ``DatasetGroupBy``, ``DataArrayGroupBy``,
+  ``DatasetResample`` and ``DataArrayResample`` now support passing positional
+  arguments to the applied function as a tuple to the ``args`` argument.
+  By `Matti Eskelinen <https://github.com/maaleske>`_.
 - 0d slices of ndarrays are now obtained directly through indexing, rather than
   extracting and wrapping a scalar, avoiding unnecessary copying. By `Daniel
   Wennberg <https://github.com/danielwe>`_.
+- Added support for ``fill_value`` with
+  :py:meth:`~xarray.DataArray.shift` and :py:meth:`~xarray.Dataset.shift`
+  By `Maximilian Roos <https://github.com/max-sixty>`_
 
 Bug fixes
 ~~~~~~~~~
@@ -83,7 +109,11 @@ Bug fixes
   By `Martin Raspaud <https://github.com/mraspaud>`_.
 - Fix parsing of ``_Unsigned`` attribute set by OPENDAP servers. (:issue:`2583`).
   By `Deepak Cherian <https://github.com/dcherian>`_
-
+- Fix failure in time encoding when exporting to netCDF with versions of pandas
+  less than 0.21.1 (:issue:`2623`).  By `Spencer Clark
+  <https://github.com/spencerkclark>`_.
+- Fix MultiIndex selection to update label and level (:issue:`2619`).
+  By `Keisuke Fujii <https://github.com/fujiisoup>`_.
 
 .. _whats-new.0.11.0:
 
@@ -256,6 +286,9 @@ Announcements of note:
   for more details.
 - We have a new :doc:`roadmap` that outlines our future development plans.
 
+- `Dataset.apply` now properly documents the way `func` is called.
+  By `Matti Eskelinen <https://github.com/maaleske>`_.
+
 Enhancements
 ~~~~~~~~~~~~
 
@@ -263,6 +296,7 @@ Enhancements
   :py:meth:`~xarray.Dataset.differentiate` are newly added.
   (:issue:`1332`)
   By `Keisuke Fujii <https://github.com/fujiisoup>`_.
+
 - Default colormap for sequential and divergent data can now be set via
   :py:func:`~xarray.set_options()`
   (:issue:`2394`)
