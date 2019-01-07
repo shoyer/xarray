@@ -11,7 +11,6 @@ dependencies:
   - matplotlib
   - netcdf4
   - pytest
-  - pytest-cov
   - pytest-env
   - coveralls
   - flake8
@@ -31,4 +30,5 @@ dependencies:
   - pydap
   - lxml
   - pip:
+    - pytest-cov
     - cfgrib>=0.9.2

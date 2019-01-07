@@ -12,7 +12,6 @@ dependencies:
   - netcdf4
   - pytest
   - pytest-env
-  - pytest-cov
   - coveralls
   - numpy
   - pandas
@@ -22,3 +21,5 @@ dependencies:
   - rasterio>=1.0
   - bottleneck
   - pydap
+  - pip:
+    - pytest-cov

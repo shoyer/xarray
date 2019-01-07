@@ -13,11 +13,11 @@ dependencies:
   - netcdf4
   - pytest
   - pytest-env
-  - pytest-cov
   - coveralls
   - flake8
   - numpy
   - scipy
   - toolz
   - pip:
+    - pytest-cov
     - git+https://github.com/pydata/pandas.git

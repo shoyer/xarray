@@ -9,7 +9,6 @@ dependencies:
   - matplotlib
   - pytest
   - pytest-env
-  - pytest-cov
   - coveralls
   - flake8
   - numpy
@@ -19,4 +18,5 @@ dependencies:
   - toolz
   - bottleneck
   - pip:
+    - pytest-cov
     - git+https://github.com/zarr-developers/zarr.git

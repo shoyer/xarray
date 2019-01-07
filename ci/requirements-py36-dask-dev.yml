@@ -10,7 +10,6 @@ dependencies:
   - netcdf4
   - pytest
   - pytest-env
-  - pytest-cov
   - coveralls
   - flake8
   - numpy
@@ -23,5 +22,6 @@ dependencies:
   - zarr
   - pseudonetcdf>=3.0.1
   - pip:
+    - pytest-cov
     - git+https://github.com/dask/dask.git
     - git+https://github.com/dask/distributed.git
